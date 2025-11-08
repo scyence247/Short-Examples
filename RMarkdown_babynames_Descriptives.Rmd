@@ -1,0 +1,287 @@
+---
+title: "Descriptives_babynames"
+author: "Scyence247"
+date: "2025-11-03"
+output: html_document
+---
+```{r setup, include=FALSE}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(ggrepel)
+library(babynames)
+library(tidyverse)
+library(tidytext)
+```
+#  Let's get started with Descriptive statistics
+
+Before we can run any statistics it is important to examine the data to see what we're working with.  Look at basics like counts, averages (arithmetic mean), median etc.
+It's also helpful to run basic plots and graphs to visualize the data
+
+ Let's load our data
+ if you have not installed babynames previously, copy and paste the following into your Console window (or remove # and run single line)
+# install.packages("babynames")
+
+ You only have to do this one time after installing R studio and R (and when you do updates)
+ From now on, you only have to call the library function with the package you're interested indicated within the parenthesis, like the following line
+
+```{r}
+
+library(babynames) #1880-2017
+data("babynames")
+
+```
+
+
+It's a large dataset so it may take a minute or so to load. This dataset contains baby names used in the U.S. from 1880 - 2017 so yeah, it's a lot of names
+
+Now let's look at the dimensions. Dimensions will indicate how many rows and columns (typically called variables) we have
+```{r}
+dim(babynames)
+```
+
+Our Console window shows us that we have 1,924,665 rows representing the numbers of babies included (1 row per baby) and 5 columns (typically referred to as variables). Since we are working within RMarkdown, we also conveniently see our output following the execution of our commands/codes.
+
+Now let's print the names of our columns so we know the type of information we have about the babies included. colnames() is a function to print the column names
+
+```{r}
+colnames(babynames)
+```
+
+We see year, sex, name, n, and prop. For more context, year refers to year of birth, sex is binary male or female sex assigned to baby at birth. name is the birth name indicated on SSN applications, n is the number of babies per sex during that year with the indicated name, and prop is short for proportion and refers to the percent of babies born per sex during that year, and is calculated as n/total number of applications per sex during that year.
+
+Since this is a large dataset, it's not very useful to print the full data table to visually look at. However, to get a better understanding of the data structure we can look at the first few rows of the data using head()
+
+```{r}
+head(babynames)
+```
+Just imagine the full table is 1,924,665 rows with these 5 columns. We see the year, sex indicated by a single capitalized letter, name with first letter as uppercase, n without comma, and prop as a decimal.It is important to note how each variable name is formatted. For example, name is not capitalized so if you run a function and call Name, R will not recognize. See examples below.
+
+```{r}
+# is there any observations/rows with missing names? TRUE = number missing name, FALSE = number not missing name
+table(is.na(babynames$name))
+
+table(is.na(babynames$Name))
+```
+We see the first command executed and output the logical (TRUE or FALSE) to the count of observations missing name. Since none of our entries have missing names, only FALSE appears. However the second command with capitalized N did not execute and instead it returned a warning to the Console for an "unknown or uninitialized column: 'Name' etc, meaning we don't have a column named Name.
+
+Getting back to head(babynames), can you interpret the first line of our output? For year 1880, there were 7,065 SSN applications for Female babies named Mary. The name Mary represents just over 7% of applications for female babies that year.
+
+Now let's look at the structure or data type for each column.
+```{r}
+str(babynames)
+```
+We see year is numeric, sex is chr (short for character), name is chr, n is int (short for integer), and prop is numeric. Numeric data are continuous, can be fraction/decimals, and can be used in all mathematical operations. Integers are whole numbers only, and can be positive or negative. character means the variable is not a number, and therefore typical operations like addition and subtraction can't be executed. However, they can be tabulated, for example the number of Females and Males. 
+
+We can also find this information from our head() output above. If you look, just under the name for each column or variable, you'll see the data type abbreviated within the <>. Under name, we see <chr>, the shortened version of character. Further, the class() function can also be executed to list the data type, however each variable must be called individually. 
+
+```{r}
+class(babynames$year)
+class(babynames$sex)
+class(babynames$name)
+class(babynames$n)
+class(babynames$prop)
+```
+Let's continue describing this dataset. We can generate summary statistics for each variable by executing the summary() function on the full data set
+```{r}
+summary(babynames)
+```
+This lists some basic summary statistics for each variable. Here we see that just because we can mathematically calculate metrics for year, we may not get useful information. It is not very meaningful to calculate the mean or median year. 
+
+We do see the metrics for n and prop may be more informative. The Min. n = 5.0 meaning the name with the fewest number of SSN applications had 5 applications (5 babies), and the name with most applicants had 99,686 applicants. If we look at the Max value for prop. we see the largest percentage of applications for any name is 8.15%.
+
+Let's see how many unique names were collected. This will require embedding some functions within functions. To do this, it's important to understand how each call/function does its job. 
+
+I usually structure these by adding a note to myself for what I want to do. 
+* I want to count the number of unique names to know the number of different names. 
+
+unique() gives a vector of values that appear the first time (unique because after the first time, it is a duplicate). However, I actually don't want to see all those names! I want to tabulate them. Since I've embedded unique() within table, R will generate a table with the number of times each name appears. As I specified unique, the table will have 1 for each name. Now, the outer most function is sum(), telling R adds up all 1s. 
+
+```{r}
+sum(table(unique(babynames$name)))
+
+```
+If you'd like to confirm this approach, run the next chunk of code which will create a subset of the babynames data named ten_names which will contain the first 5 rows of data. With just 10 rows, you can visually confirm the approach.
+
+```{r}
+ten_names <- babynames[1:10,]
+unique(ten_names$name)
+table(unique(ten_names$name))
+sum(table(unique(ten_names$name)))
+```
+Some names are unisex, meaning box sexes may have the name. Let's look at which names appear across the sexes. Let's use some more advanced approaches for looking at the data 
+
+```{r}
+
+
+library(tidyr)
+
+unisex_2000 <- babynames %>%
+  filter(year %in% c(1999,2000)) %>%
+  group_by(year) %>%
+  select(name, year, sex, prop) %>%
+  pivot_wider(names_from = sex, values_from = prop) %>%
+  drop_na() 
+
+plot1 <- unisex_2000 %>%
+  ggplot(aes(x = F, y = M)) +
+  geom_point(alpha = 0.6, color = "steelblue") +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "gray") +
+  labs(title = "Names that took over SSN Admin for the 99 and 2000s",
+       x = "Proportion (Female)", y = "Proportion (Male)")
+plot1
+
+```
+Anticlimactic right! We see the data points yet it's not telling us much. Let's jazz this up to show the top names
+```{r}
+
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(ggrepel)
+
+unisex_2000_top <- babynames %>%
+  filter(year %in% c(1999, 2000)) %>%
+  select(name, year, sex, n, prop) %>%
+  pivot_wider(names_from = sex, values_from = c(n,prop)) %>%
+  drop_na() %>%
+  mutate(total = n_F + n_M,
+         total_prop = prop_F + prop_M)
+
+# filter for names with 85-90 total names across male and female
+
+min_85 <- unisex_2000_top %>%
+  filter(total >= 85 & total <91)
+
+top_unisex <- min_85 %>%
+  slice_max(total, n = 15)
+
+plot2 <- min_85 %>%
+  ggplot(aes(x = prop_F, y = prop_M)) +
+  geom_point(alpha = 0.4, color = "steelblue") +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "gray") +
+  geom_text_repel(
+    data = top_unisex,
+    aes(label = name),
+    color = "darkred",
+    size = 3.5
+  ) +
+  labs(
+    title = "The Top 15 Unisex Names that Took over Y2k",
+    x = "Proportion (Female)",
+    y = "Proportion (Male)"
+  ) +
+  theme_minimal()
+
+plot2
+
+unisex_1900_2017_plot <- babynames %>%
+  filter(year %in% c(1900, 2000, 2017)) %>%
+  group_by(year) %>%
+  slice_max(n, n = 10) %>%
+  ungroup() %>%
+  ggplot(aes(x = reorder_within(name, n, year), y = n, fill = factor(year))) +
+  geom_col(show.legend = FALSE) +
+  coord_flip() +
+  facet_wrap(~year, scales = "free_y") +
+  scale_x_reordered() +
+  labs(title = "Top 10 Unisex Names in 1900, 2000, and 2017",
+       x = "Name", 
+       y = "Number of Babies"
+       ) + theme_minimal()
+
+
+```
+The dashed diagonal line differentiates between male and female names. The closer the points are to the line, more male and females share the name and conversely, the further the point away from the line indicates more separations between the sexes. If the point is closer to the x axis (towards Proportion (Female)), the more female babies have the name. If it's closer to the y axis (towards Proportion (Male)), the more male babies that the name.
+We see Haiden and Lashawn, and Cadence and Morgen are closer to the diagnonal. There are no points on this line meaning there's no name with equal number of males and females. Haiden and Lashawn are above the diagonal meaning, though female babies also have the name, most are males. Similarly, Cadence and Morgen are below the diagonal indicating thought males have the name, most are females.
+
+Let's split the data by sex. The code below generates 2 new objects female_names and male_names using the subset() function which requires specifying the data we want to subset (here babynames), and how to subset it (here by column named "sex", where the value is "F" for female and "M" for male)
+Here's a simple way for those who are new to R:
+
+```{r}
+
+female_names <- subset(babynames, sex == "F")
+male_names <- subset(babynames, sex == "M")
+```
+To confirm we have only Female, let's generate a table by sex to display each type of sex
+```{r}
+table(babynames$sex)
+table(female_names$sex)
+table(male_names$sex)
+```
+
+Our output shows the original dataset has 1138293 Females, and 786,372 Males which is also consistent with our subsetted data.
+
+And here's a more advanced approach for those who are familiar with tidyverse.
+
+```{r}
+library(tidyverse)
+
+tidy_female_names <- babynames %>%
+  filter(sex == "F")
+
+tidy_male_names <- babynames %>%
+  filter(sex == "M")
+
+tidy_female_names %>%
+  count(sex)
+
+tidy_male_names %>%
+  count(sex)
+
+```
+Now that we have separate datasets for male and female names, let's look at how many unique names were submitted to SSN. Then let's look at the top 10 names in select years
+
+```{r}
+sum(table(unique(babynames$name)))
+
+sum(table(unique(female_names$name)))
+sum(table(unique(male_names$name)))
+
+```
+
+We see 97,310 different names are in this dataset! We also see there are 67,046 unique female names and 40,927 male names. Now let's look at top 10 female and male names in 1880, 1900, 2000, and 2017
+```{r}
+
+library(tidytext)
+
+
+female_1880_2017 <- female_names %>%
+  filter(year %in% c(1880, 1900, 2000, 2017)) %>%
+  group_by(year) %>%
+  slice_max(n, n = 10) %>%
+  ungroup() %>%
+  ggplot(aes(x = reorder_within(name, n, year), y = n, fill = factor(year))) +
+  geom_col(show.legend = FALSE) +
+  coord_flip() +
+  facet_wrap(~year, scales = "free_y") +
+  scale_x_reordered() +
+  labs(title = "Top 10 Girl Names in years 1880, 1900, 2000, and 2017",
+       x = "Name", 
+       y = "Number of Babies"
+       ) + theme_minimal()
+
+female_1880_2017
+```
+It looks like Emma made a comeback from 1880 to 2017!
+```{r}
+
+male_1880_2017 <- male_names %>%
+  filter(year %in% c(1880, 1900, 2000, 2017)) %>%
+  group_by(year) %>%
+  slice_max(n, n = 10) %>%
+  ungroup() %>%
+  ggplot(aes(x = reorder_within(name, n, year), y = n, fill = factor(year))) +
+  geom_col(show.legend = FALSE) +
+  coord_flip() +
+  facet_wrap(~year, scales = "free_y") +
+  scale_x_reordered() +
+  labs(title = "Top 10 Boy Names in Years 1880, 1900, 2000, and 2017",
+       x = "Name", 
+       y = "Number of Babies"
+       ) + theme_minimal()
+
+male_1880_2017
+
+
+```
